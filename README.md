@@ -1,0 +1,1 @@
+Three-dimensional plot that shows the implied volatility of options across different strike prices and maturities. Implied volatility (IV) is a measure of the market's expectations of the future volatility of the underlying asset's price.
