@@ -3,118 +3,120 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from scipy.stats import norm
-from scipy.optimize import brentq
 from numpy import log, sqrt, exp
-import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.pyplot as plt
 
-#######################
 # Page configuration
-st.set_page_config(
-    page_title="Implied Volatility Surface",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Implied Volatility Surface", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
-# Custom CSS to inject into Streamlit
-st.markdown("""
-<style>
-/* Adjust the size and alignment of the value containers */
-.metric-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 8px;
-    width: auto;
-    margin: 0 auto;
-}
-.metric-label {
-    font-size: 1rem;
-    margin-bottom: 4px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Black-Scholes Model for implied volatility calculation
+# Define the Black-Scholes model
 class BlackScholes:
-    def __init__(self, S, K, T, r, market_price, option_type='call'):
-        self.S = S
-        self.K = K
-        self.T = T
-        self.r = r
-        self.market_price = market_price
-        self.option_type = option_type
+    def __init__(self, time_to_maturity, strike, current_price, volatility, interest_rate):
+        self.time_to_maturity = time_to_maturity
+        self.strike = strike
+        self.current_price = current_price
+        self.volatility = volatility
+        self.interest_rate = interest_rate
 
-    def d1(self, sigma):
-        return (log(self.S / self.K) + (self.r + 0.5 * sigma ** 2) * self.T) / (sigma * sqrt(self.T))
+    def calculate_prices(self):
+        d1 = (log(self.current_price / self.strike) + (self.interest_rate + 0.5 * self.volatility ** 2) * self.time_to_maturity) / (self.volatility * sqrt(self.time_to_maturity))
+        d2 = d1 - self.volatility * sqrt(self.time_to_maturity)
+        call_price = self.current_price * norm.cdf(d1) - self.strike * exp(-self.interest_rate * self.time_to_maturity) * norm.cdf(d2)
+        put_price = self.strike * exp(-self.interest_rate * self.time_to_maturity) * norm.cdf(-d2) - self.current_price * norm.cdf(-d1)
+        return call_price, put_price
 
-    def d2(self, sigma):
-        return self.d1(sigma) - sigma * sqrt(self.T)
+# Sidebar inputs
+st.sidebar.title("📊 Implied Volatility Surface")
+current_price = st.sidebar.number_input("Current Asset Price", value=100.0)
+time_to_maturity = st.sidebar.number_input("Time to Maturity (Years)", value=1.0)
+volatility = st.sidebar.number_input("Volatility (σ)", value=0.2)
+interest_rate = st.sidebar.number_input("Risk-Free Interest Rate", value=0.05)
 
-    def call_price(self, sigma):
-        d1 = self.d1(sigma)
-        d2 = self.d2(sigma)
-        return self.S * norm.cdf(d1) - self.K * exp(-self.r * self.T) * norm.cdf(d2)
+# Adding multiple strikes and maturities
+strike_prices = st.sidebar.text_input("Strike Prices (comma-separated)", "90, 100, 110")
+strike_prices = [float(x) for x in strike_prices.split(",")]
 
-    def put_price(self, sigma):
-        d1 = self.d1(sigma)
-        d2 = self.d2(sigma)
-        return self.K * exp(-self.r * self.T) * norm.cdf(-d2) - self.S * norm.cdf(-d1)
+# Display inputs
+input_data = {
+    "Current Asset Price": [current_price],
+    "Time to Maturity (Years)": [time_to_maturity],
+    "Volatility (σ)": [volatility],
+    "Risk-Free Interest Rate": [interest_rate],
+    "Strike Prices": [strike_prices],
+}
+input_df = pd.DataFrame(input_data)
+st.table(input_df)
 
-    def implied_volatility(self):
-        try:
-            if self.option_type == 'call':
-                price_func = self.call_price
-            else:
-                price_func = self.put_price
-            implied_vol = brentq(lambda x: price_func(x) - self.market_price, 1e-6, 10)
-            return implied_vol
-        except Exception:
-            return np.nan
+# Calculate and display option prices
+bs_models = [BlackScholes(time_to_maturity, strike, current_price, volatility, interest_rate) for strike in strike_prices]
+prices = [bs_model.calculate_prices() for bs_model in bs_models]
+call_prices, put_prices = zip(*prices)
+call_prices = np.array(call_prices)
+put_prices = np.array(put_prices)
 
-# Sidebar for User Inputs
-with st.sidebar:
-    st.title("📈 Implied Volatility Surface")
-    st.write("`Created by:`")
-    linkedin_url = "https://www.linkedin.com/in/branden-bahk/"
-    st.markdown(f'<a href="{linkedin_url}" target="_blank" style="text-decoration: none; color: inherit;"><img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" width="25" height="25" style="vertical-align: middle; margin-right: 10px;">`Bahk, Branden`</a>', unsafe_allow_html=True)
+# Display prices
+for i, strike in enumerate(strike_prices):
+    st.write(f"Strike Price: {strike}")
+    st.write(f"Call Price: ${call_prices[i]:.2f}")
+    st.write(f"Put Price: ${put_prices[i]:.2f}")
 
-    S = st.number_input("Current Asset Price", value=100.0)
-    r = st.number_input("Risk-Free Interest Rate", value=0.05)
+# Interactive heatmap for implied volatility
+spot_min = st.sidebar.number_input('Min Spot Price', min_value=0.01, value=current_price*0.8, step=0.01)
+spot_max = st.sidebar.number_input('Max Spot Price', min_value=0.01, value=current_price*1.2, step=0.01)
+vol_min = st.sidebar.slider('Min Volatility for Heatmap', min_value=0.01, max_value=1.0, value=volatility*0.5, step=0.01)
+vol_max = st.sidebar.slider('Max Volatility for Heatmap', min_value=0.01, max_value=1.0, value=volatility*1.5, step=0.01)
 
-    st.markdown("---")
-    st.write("Option Market Data")
-    strikes = st.text_area("Strike Prices (comma-separated)", value="90,100,110")
-    maturities = st.text_area("Maturities (Years, comma-separated)", value="0.5,1,1.5")
-    option_prices = st.text_area("Option Market Prices (comma-separated, same order as strikes)", value="12,10,8")
-    option_type = st.selectbox("Option Type", ["call", "put"])
+spot_range = np.linspace(spot_min, spot_max, 50)
+vol_range = np.linspace(vol_min, vol_max, 50)
 
-    strike_list = [float(x) for x in strikes.split(",")]
-    maturity_list = [float(x) for x in maturities.split(",")]
-    price_list = [float(x) for x in option_prices.split(",")]
+# Plot heatmap
+def plot_heatmap(bs_models, spot_range, vol_range, strike_prices):
+    call_prices = np.zeros((len(vol_range), len(spot_range), len(strike_prices)))
+    put_prices = np.zeros((len(vol_range), len(spot_range), len(strike_prices)))
+    
+    for i, vol in enumerate(vol_range):
+        for j, spot in enumerate(spot_range):
+            for k, bs_model in enumerate(bs_models):
+                bs_temp = BlackScholes(
+                    time_to_maturity=bs_model.time_to_maturity,
+                    strike=strike_prices[k],
+                    current_price=spot,
+                    volatility=vol,
+                    interest_rate=bs_model.interest_rate
+                )
+                call_price, put_price = bs_temp.calculate_prices()
+                call_prices[i, j, k] = call_price
+                put_prices[i, j, k] = put_price
+    
+    fig_call, axes_call = plt.subplots(1, len(strike_prices), figsize=(15, 8))
+    fig_put, axes_put = plt.subplots(1, len(strike_prices), figsize=(15, 8))
 
-# Calculate Implied Volatilities
-implied_vols = []
-for K in strike_list:
-    row = []
-    for T, market_price in zip(maturity_list, price_list):
-        bs_model = BlackScholes(S, K, T, r, market_price, option_type)
-        iv = bs_model.implied_volatility()
-        row.append(iv)
-    implied_vols.append(row)
+    for k, strike in enumerate(strike_prices):
+        sns.heatmap(call_prices[:, :, k], xticklabels=np.round(spot_range, 2), yticklabels=np.round(vol_range, 2), annot=False, fmt=".2f", cmap="viridis", ax=axes_call[k])
+        axes_call[k].set_title(f'CALL (Strike={strike})')
+        axes_call[k].set_xlabel('Spot Price')
+        axes_call[k].set_ylabel('Volatility')
+        
+        sns.heatmap(put_prices[:, :, k], xticklabels=np.round(spot_range, 2), yticklabels=np.round(vol_range, 2), annot=False, fmt=".2f", cmap="viridis", ax=axes_put[k])
+        axes_put[k].set_title(f'PUT (Strike={strike})')
+        axes_put[k].set_xlabel('Spot Price')
+        axes_put[k].set_ylabel('Volatility')
+    
+    return fig_call, fig_put
 
-# Convert to DataFrame for easier handling
-iv_df = pd.DataFrame(implied_vols, index=strike_list, columns=maturity_list)
+# Main Page
+st.title("Implied Volatility Surface")
 
-# Plot Implied Volatility Surface
-fig = go.Figure(data=[go.Surface(z=iv_df.values, x=strike_list, y=maturity_list)])
-fig.update_layout(title='Implied Volatility Surface', autosize=True,
-                  scene=dict(xaxis_title='Strike Price', yaxis_title='Maturity (Years)', zaxis_title='Implied Volatility'),
-                  margin=dict(l=65, r=50, b=65, t=90))
+# Heatmap
+col1, col2 = st.columns(2)
 
-st.plotly_chart(fig)
+with col1:
+    st.subheader("Call Price Heatmap")
+    heatmap_fig_call, _ = plot_heatmap(bs_models, spot_range, vol_range, strike_prices)
+    st.pyplot(heatmap_fig_call)
 
-# Display Table of Implied Volatilities
-st.markdown("### Implied Volatility Table")
-st.write(iv_df)
+with col2:
+    st.subheader("Put Price Heatmap")
+    _, heatmap_fig_put = plot_heatmap(bs_models, spot_range, vol_range, strike_prices)
+    st.pyplot(heatmap_fig_put)
