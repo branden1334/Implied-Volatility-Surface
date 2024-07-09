@@ -27,7 +27,6 @@ class BlackScholes:
 # Sidebar inputs
 st.sidebar.title("📊 Implied Volatility Surface")
 current_price = st.sidebar.number_input("Current Asset Price", value=100.0)
-volatility = st.sidebar.number_input("Volatility (σ)", value=0.2)
 interest_rate = st.sidebar.number_input("Risk-Free Interest Rate", value=0.05)
 
 # Adding multiple strikes and maturities
@@ -39,7 +38,6 @@ maturities = [float(x) for x in maturities.split(",")]
 # Display inputs
 input_data = {
     "Current Asset Price": [current_price],
-    "Volatility (σ)": [volatility],
     "Risk-Free Interest Rate": [interest_rate],
     "Strike Prices": [strike_prices],
     "Maturities": [maturities],
@@ -47,14 +45,18 @@ input_data = {
 input_df = pd.DataFrame(input_data)
 st.table(input_df)
 
+# Hypothetical implied volatility function
+def implied_volatility(strike, maturity):
+    base_vol = 0.2
+    vol = base_vol + 0.1 * (strike / current_price - 1) * (1 - maturity)
+    return max(vol, 0.01)  # Ensure volatility is not negative
+
 # Calculate implied volatility surface
 vol_surface = np.zeros((len(maturities), len(strike_prices)))
 
 for i, maturity in enumerate(maturities):
     for j, strike in enumerate(strike_prices):
-        bs_model = BlackScholes(maturity, strike, current_price, volatility, interest_rate)
-        call_price, _ = bs_model.calculate_prices()
-        vol_surface[i, j] = bs_model.volatility
+        vol_surface[i, j] = implied_volatility(strike, maturity)
 
 # Plot 3D surface
 fig = go.Figure(data=[go.Surface(z=vol_surface, x=strike_prices, y=maturities)])
