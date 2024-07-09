@@ -77,8 +77,8 @@ class BlackScholes:
 with st.sidebar:
     st.title("📈 Implied Volatility Surface")
     st.write("`Created by:`")
-    linkedin_url = "https://www.linkedin.com/in/mprudhvi/"
-    st.markdown(f'<a href="{linkedin_url}" target="_blank" style="text-decoration: none; color: inherit;"><img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" width="25" height="25" style="vertical-align: middle; margin-right: 10px;">`Prudhvi Reddy, Muppala`</a>', unsafe_allow_html=True)
+    linkedin_url = "https://www.linkedin.com/in/branden-bahk/"
+    st.markdown(f'<a href="{linkedin_url}" target="_blank" style="text-decoration: none; color: inherit;"><img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" width="25" height="25" style="vertical-align: middle; margin-right: 10px;">`Bahk, Branden`</a>', unsafe_allow_html=True)
 
     S = st.number_input("Current Asset Price", value=100.0)
     r = st.number_input("Risk-Free Interest Rate", value=0.05)
